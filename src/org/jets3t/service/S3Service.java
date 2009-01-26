@@ -139,6 +139,8 @@ public abstract class S3Service implements Serializable {
         // timeout after 5 minutes, while failed DNS lookups will be retried after 1 second.
         System.setProperty("networkaddress.cache.ttl", "300");
         System.setProperty("networkaddress.cache.negative.ttl", "1");
+        org.jets3t.service.mx.S3ServiceMx.registerMBean();
+        org.jets3t.service.mx.S3ServiceExceptionMx.registerMBean();
     }
 
     /**
@@ -1326,7 +1328,9 @@ public abstract class S3Service implements Serializable {
      */
     public S3Bucket[] listAllBuckets() throws S3ServiceException {
         assertAuthenticatedConnection("List all buckets");
-        return listAllBucketsImpl();
+        S3Bucket[] buckets = listAllBucketsImpl();
+        org.jets3t.service.mx.S3BucketMx.registerMBeans(buckets);
+        return buckets;
     }
 
     /**
@@ -1384,7 +1388,10 @@ public abstract class S3Service implements Serializable {
     public S3Object[] listObjects(String bucketName, String prefix, String delimiter, 
         long maxListingLength) throws S3ServiceException
     {
-        return listObjectsImpl(bucketName, prefix, delimiter, maxListingLength);
+        org.jets3t.service.mx.S3BucketMx.list(bucketName);
+        S3Object[] objects = listObjectsImpl(bucketName, prefix, delimiter, maxListingLength);
+        org.jets3t.service.mx.S3ObjectMx.registerMBeans(bucketName, objects);
+        return objects;
     }
 
     /**
@@ -1418,8 +1425,11 @@ public abstract class S3Service implements Serializable {
     public S3ObjectsChunk listObjectsChunked(String bucketName, String prefix, String delimiter, 
         long maxListingLength, String priorLastKey) throws S3ServiceException
     {
-        return listObjectsChunkedImpl(bucketName, prefix, delimiter, maxListingLength, 
+        org.jets3t.service.mx.S3BucketMx.list(bucketName);
+        S3ObjectsChunk chunk = listObjectsChunkedImpl(bucketName, prefix, delimiter, maxListingLength, 
             priorLastKey, false);
+        org.jets3t.service.mx.S3ObjectMx.registerMBeans(bucketName, chunk.getObjects());
+        return chunk;
     }
     
     /**
@@ -1457,8 +1467,11 @@ public abstract class S3Service implements Serializable {
     public S3ObjectsChunk listObjectsChunked(String bucketName, String prefix, String delimiter, 
         long maxListingLength, String priorLastKey, boolean completeListing) throws S3ServiceException
     {
-        return listObjectsChunkedImpl(bucketName, prefix, delimiter, 
+        org.jets3t.service.mx.S3BucketMx.list(bucketName);
+        S3ObjectsChunk chunk = listObjectsChunkedImpl(bucketName, prefix, delimiter, 
             maxListingLength, priorLastKey, completeListing);
+        org.jets3t.service.mx.S3ObjectMx.registerMBeans(bucketName, chunk.getObjects());
+        return chunk;
     }    
 
     /**
@@ -1585,6 +1598,7 @@ public abstract class S3Service implements Serializable {
      */
     public S3Object putObject(String bucketName, S3Object object) throws S3ServiceException {
         assertValidObject(object, "Create Object in bucket " + bucketName);        
+        org.jets3t.service.mx.S3ObjectMx.put(bucketName, object.getKey());
         return putObjectImpl(bucketName, object);
     }
     
@@ -1643,6 +1657,7 @@ public abstract class S3Service implements Serializable {
         Map destinationMetadata =
             replaceMetadata ? destinationObject.getModifiableMetadata() : null;
         
+        org.jets3t.service.mx.S3ObjectMx.copy(sourceBucketName, sourceObjectKey);
         return copyObjectImpl(sourceBucketName, sourceObjectKey, 
             destinationBucketName, destinationObject.getKey(), 
             destinationObject.getAcl(), destinationMetadata,
@@ -1872,6 +1887,7 @@ public abstract class S3Service implements Serializable {
      */
     public void deleteObject(String bucketName, String objectKey) throws S3ServiceException {
         assertValidObject(objectKey, "deleteObject");
+        org.jets3t.service.mx.S3ObjectMx.delete(bucketName, objectKey);
         deleteObjectImpl(bucketName, objectKey);
     }
 
@@ -1991,6 +2007,7 @@ public abstract class S3Service implements Serializable {
         Long byteRangeStart, Long byteRangeEnd) throws S3ServiceException 
     {
         assertValidBucket(bucket, "Get Object");
+        org.jets3t.service.mx.S3ObjectMx.get(bucket.getName(), objectKey);
         return getObjectImpl(bucket.getName(), objectKey, ifModifiedSince, ifUnmodifiedSince, 
             ifMatchTags, ifNoneMatchTags, byteRangeStart, byteRangeEnd);
     }
@@ -2037,6 +2054,7 @@ public abstract class S3Service implements Serializable {
         Calendar ifUnmodifiedSince, String[] ifMatchTags, String[] ifNoneMatchTags,
         Long byteRangeStart, Long byteRangeEnd) throws S3ServiceException 
     {
+        org.jets3t.service.mx.S3ObjectMx.get(bucketName, objectKey);
         return getObjectImpl(bucketName, objectKey, ifModifiedSince, ifUnmodifiedSince, 
             ifMatchTags, ifNoneMatchTags, byteRangeStart, byteRangeEnd);
     }

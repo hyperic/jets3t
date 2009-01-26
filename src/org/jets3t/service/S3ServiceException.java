@@ -50,6 +50,7 @@ public class S3ServiceException extends Exception {
 	public S3ServiceException(String message, String xmlMessage) {
 		super(message);
         parseS3XmlMessage(xmlMessage);
+        org.jets3t.service.mx.S3ServiceExceptionMx.increment(getS3ErrorCode());
 	}
 
 	public S3ServiceException() {

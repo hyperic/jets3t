@@ -488,6 +488,7 @@ public class RestS3Service extends S3Service implements SignedUrlHandler, AWSReq
             if (t instanceof S3ServiceException) {
                 throw (S3ServiceException) t;                
             } else {
+                org.jets3t.service.mx.S3ServiceExceptionMx.increment();
                 throw new S3ServiceException("S3 " + httpMethod.getName() 
                     + " connection failed for '" + httpMethod.getPath() + "'", t);                
             }            
