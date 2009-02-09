@@ -165,7 +165,7 @@ import com.centerkey.utils.BareBonesBrowserLaunch;
 public class Cockpit extends JApplet implements S3ServiceEventListener, ActionListener, 
     ListSelectionListener, HyperlinkActivatedListener, CredentialsProvider 
 {    
-    private static final long serialVersionUID = 1275456909864052884L;
+    private static final long serialVersionUID = -3982368878320163058L;
 
     private static final Log log = LogFactory.getLog(Cockpit.class);
     
@@ -195,8 +195,9 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
      */
     private S3ServiceMulti s3ServiceMulti = null;
     private CloudFrontService cloudFrontService = null;
+    private boolean cloudFrontMembershipChecked = false;
     
-    private Frame ownerFrame = null;
+    private JFrame ownerFrame = null;
     private boolean isStandAloneApplication = false;
     
     // Service main menu items
@@ -270,6 +271,8 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
     private Jets3tProperties cockpitProperties = null;
     private SkinsFactory skinsFactory = null;
     
+    private S3Bucket currentSelectedBucket = null;
+    
     /**
      * Constructor to run this application as an Applet.
      */
@@ -305,10 +308,10 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
             while (!(c instanceof Frame) && c.getParent() != null) {
                 c = c.getParent();
             }
-            if (!(c instanceof Frame)) {
+            if (!(c instanceof JFrame)) {
                 this.ownerFrame = new JFrame();        
             } else {
-                this.ownerFrame = (Frame) c;                    
+                this.ownerFrame = (JFrame) c;                    
             }
         }
                         
@@ -402,22 +405,14 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
         bucketsPanel.add(bucketActionButton, 
             new GridBagConstraints(1, 0, 1, 1, 0, 0, GridBagConstraints.EAST, GridBagConstraints.HORIZONTAL, insetsZero, 0, 0));
 
-        bucketTableModel = new BucketTableModel();
+        bucketTableModel = new BucketTableModel(false);
         bucketTableModelSorter = new TableSorter(bucketTableModel);        
         bucketsTable = new JTable(bucketTableModelSorter);
         bucketTableModelSorter.setTableHeader(bucketsTable.getTableHeader());        
         bucketsTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         bucketsTable.getSelectionModel().addListSelectionListener(this);
         bucketsTable.setShowHorizontalLines(true);
-        bucketsTable.setShowVerticalLines(false);
-                
-        // Set column width for Cloud Front distributions indicator.
-        TableColumn distributionFlagColumn = bucketsTable.getColumnModel().getColumn(1);
-        int distributionFlagColumnWidth = 18; 
-        distributionFlagColumn.setPreferredWidth(distributionFlagColumnWidth);
-        distributionFlagColumn.setMaxWidth(distributionFlagColumnWidth);
-        distributionFlagColumn.setMinWidth(0);
-        
+        bucketsTable.setShowVerticalLines(false);                        
         bucketsTable.addMouseListener(new ContextMenuListener());
         bucketsPanel.add(new JScrollPane(bucketsTable), 
             new GridBagConstraints(0, 1, 2, 1, 1, 1, GridBagConstraints.CENTER, GridBagConstraints.BOTH, insetsZero, 0, 0));
@@ -533,7 +528,11 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
      */
     private void initMenus() {
         JMenuBar appMenuBar = new JMenuBar();
-        this.setJMenuBar(appMenuBar);
+        if (this.isStandAloneApplication) {
+            ownerFrame.setJMenuBar(appMenuBar);
+        } else {
+            this.setJMenuBar(appMenuBar);            
+        }
         
         // Service menu
         JMenu serviceMenu = new JMenu("Service");
@@ -1076,7 +1075,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
         
         // Ooops...
         else {
-            log.warn("Unrecognised ActionEvent command '" + event.getActionCommand() + "' in " + event);
+            log.debug("Unrecognised ActionEvent command '" + event.getActionCommand() + "' in " + event);
         }
     }
         
@@ -1109,29 +1108,14 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
             startupDialog.dispose();
             
             if (awsCredentials == null) {
+                log.debug("Log in cancelled by user");
                 return;
             }
 
             s3ServiceMulti = new S3ServiceMulti(
                 new RestS3Service(awsCredentials, APPLICATION_DESCRIPTION, this), this);
-            cloudFrontService = new CloudFrontService(
-                awsCredentials, APPLICATION_DESCRIPTION, this, null, null);
-            try {
-                // Check that the user is actually signed-up for CloudFront.
-                cloudFrontService.listDistributions();
-            } catch (CloudFrontServiceException e) {
-                if ("OptInRequired".equals(e.getErrorCode())) {
-                    log.warn("Your AWS account is not subscribed to the Amazon CloudFront service, "
-                        + "you will not be able to manage distributions");
-                }
-                cloudFrontService = null;                    
-            }
-
-            if (awsCredentials == null) {
-                log.debug("Log in cancelled by user");
-                return;
-            } 
             
+            cloudFrontMembershipChecked = false;
             listAllBuckets();            
 
             objectsSummaryLabel.setText(" ");
@@ -1141,9 +1125,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
             
             refreshBucketMenuItem.setEnabled(true);
             createBucketMenuItem.setEnabled(true);
-            bucketLoggingMenuItem.setEnabled(true);
-            
-            manageDistributionsMenuItem.setEnabled(cloudFrontService != null);
+            bucketLoggingMenuItem.setEnabled(true);            
         } catch (Exception e) {
             String message = "Unable to log in to S3";
             log.error(message, e);
@@ -1193,7 +1175,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
      * Displays the currently selected bucket's properties in the dialog {@link ItemPropertiesDialog}. 
      */
     private void listBucketProperties() {
-        final S3Bucket selectedBucket = getCurrentSelectedBucket();
+        final S3Bucket selectedBucket = currentSelectedBucket;
         
         if (selectedBucket.getAcl() == null || !selectedBucket.isLocationKnown()) {
             // Retrieve all a bucket's details before displaying the summary.
@@ -1251,6 +1233,8 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
      * knows to display the dialog as the {@link #isViewingOrModifyingObjectProperties} flag is set.
      */
     private void displayObjectsAttributesDialog() {
+        final S3Bucket selectedBucket = currentSelectedBucket;
+
         runInBackgroundThread(new Runnable() {
             public void run() {
                 if (!retrieveObjectsDetails(getSelectedObjects())) {
@@ -1279,10 +1263,10 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
                 if (!objectsAttributesDialog.isModifyActionApproved()) {
                     // Do nothing.
                     return;
-                }                                                                    
-                
+                }                                                         
+                                
                 // Retain ACL settings from original objects.
-                if (!s3ServiceMulti.getObjectACLs(getCurrentSelectedBucket(), sourceObjects)) {
+                if (!s3ServiceMulti.getObjectACLs(selectedBucket, sourceObjects)) {
                     return;
                 }
                 for (int i = 0; i < sourceObjects.length; i++) {
@@ -1292,13 +1276,13 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
                 
                 // Copy objects in-place, to REPLACE their metadata attributes.
                 ok = s3ServiceMulti.copyObjects(
-                    getCurrentSelectedBucket().getName(), getCurrentSelectedBucket().getName(),
+                    selectedBucket.getName(), selectedBucket.getName(),
                     sourceObjectKeys, destinationObjects, true);
                 
                 // Refresh details for modified objects
                 if (ok) {
                     s3ServiceMulti.getObjectsHeads(
-                        getCurrentSelectedBucket(), destinationObjects);
+                        selectedBucket, destinationObjects);
                 }
             }
         });        
@@ -1314,10 +1298,49 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
         bucketsTable.clearSelection();       
         bucketTableModel.removeAllBuckets();
         objectTableModel.removeAllObjects();   
+        final Cockpit myself = this;
                 
         // This is all very convoluted. This was necessary so we can display the status dialog box.        
         runInBackgroundThread(new Runnable() {
-            public void run() {                
+            public void run() {    
+                if (!cloudFrontMembershipChecked) {
+                    // Check whether the user is signed-up for CloudFront.
+                    startProgressDialog("Checking for CloudFront account membership");
+                    try {
+                        cloudFrontService = new CloudFrontService(
+                            s3ServiceMulti.getAWSCredentials(), APPLICATION_DESCRIPTION, myself, null, null);
+                        cloudFrontService.listDistributions();
+                    } catch (CloudFrontServiceException e) {
+                        stopProgressDialog();
+    
+                        if ("OptInRequired".equals(e.getErrorCode())) {
+                            log.debug("Your AWS account is not subscribed to the Amazon CloudFront service, "
+                                + "you will not be able to manage distributions");
+                        }
+                        cloudFrontService = null;
+                    } finally {
+                        stopProgressDialog();
+                        cloudFrontMembershipChecked = true;
+                        
+                        // Update the bucket table to show, or not show, distributions
+                        bucketTableModel = new BucketTableModel(cloudFrontService != null);
+                        bucketTableModelSorter = new TableSorter(bucketTableModel);        
+                        bucketsTable.setModel(bucketTableModelSorter);
+                        bucketTableModelSorter.setTableHeader(bucketsTable.getTableHeader());
+                        
+                        if (cloudFrontService != null) {
+                            // Set column width for Cloud Front distributions indicator.
+                            TableColumn distributionFlagColumn = bucketsTable.getColumnModel().getColumn(1);
+                            int distributionFlagColumnWidth = 18; 
+                            distributionFlagColumn.setPreferredWidth(distributionFlagColumnWidth);
+                            distributionFlagColumn.setMaxWidth(distributionFlagColumnWidth);
+                            distributionFlagColumn.setMinWidth(0);
+                        }
+                        
+                        manageDistributionsMenuItem.setEnabled(cloudFrontService != null);                        
+                    }
+                }
+                
                 startProgressDialog("Listing buckets for " + s3ServiceMulti.getAWSCredentials().getAccessKey());
                 try {
                     final S3Bucket[] buckets = s3ServiceMulti.getS3Service().listAllBuckets();
@@ -1401,8 +1424,16 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
      * Actions performed when a bucket is selected in the bucket list table.
      */
     private void bucketSelectedAction() {
-        S3Bucket newlySelectedBucket = getCurrentSelectedBucket();
-        if (newlySelectedBucket == null) {
+        this.currentSelectedBucket = null;
+
+        // Find the selected bucket in the buckets table, if any.
+        if (bucketsTable.getSelectedRows().length != 0) {
+            this.currentSelectedBucket = bucketTableModel.getBucket(
+                bucketTableModelSorter.modelIndex(
+                    bucketsTable.getSelectedRows()[0]));
+        }
+        
+        if (currentSelectedBucket == null) {
             viewBucketPropertiesMenuItem.setEnabled(false);
             refreshBucketMenuItem.setEnabled(true);
             updateBucketACLMenuItem.setEnabled(false);
@@ -1416,30 +1447,28 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
             
             objectsTable.getDropTarget().setActive(false);
             objectsTableSP.getDropTarget().setActive(false);
-            
-            return;
-        }
-        
-        viewBucketPropertiesMenuItem.setEnabled(true);
-        refreshBucketMenuItem.setEnabled(true);
-        updateBucketACLMenuItem.setEnabled(true);
-        updateBucketRequesterPaysStatusMenuItem.setEnabled(true);
-        deleteBucketMenuItem.setEnabled(true);
-        
-        refreshObjectMenuItem.setEnabled(true);
-        uploadFilesMenuItem.setEnabled(true);
-        
-        objectsTable.getDropTarget().setActive(true);
-        objectsTableSP.getDropTarget().setActive(true);
-        
-        if (cachedBuckets.containsKey(newlySelectedBucket.getName())) {
-            S3Object[] objects = (S3Object[]) cachedBuckets.get(newlySelectedBucket.getName());
-            
-            objectTableModel.removeAllObjects();                    
-            objectTableModel.addObjects(objects);
-            updateObjectsSummary(false);
         } else {        
-            listObjects();
+            viewBucketPropertiesMenuItem.setEnabled(true);
+            refreshBucketMenuItem.setEnabled(true);
+            updateBucketACLMenuItem.setEnabled(true);
+            updateBucketRequesterPaysStatusMenuItem.setEnabled(true);
+            deleteBucketMenuItem.setEnabled(true);
+            
+            refreshObjectMenuItem.setEnabled(true);
+            uploadFilesMenuItem.setEnabled(true);
+            
+            objectsTable.getDropTarget().setActive(true);
+            objectsTableSP.getDropTarget().setActive(true);
+            
+            if (cachedBuckets.containsKey(currentSelectedBucket.getName())) {
+                S3Object[] objects = (S3Object[]) cachedBuckets.get(currentSelectedBucket.getName());
+                
+                objectTableModel.removeAllObjects();                    
+                objectTableModel.addObjects(objects);
+                updateObjectsSummary(false);
+            } else {        
+                listObjects();
+            }
         }
     }
     
@@ -1454,7 +1483,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
         deleteObjectMenuItem.setEnabled(count > 0);
         viewOrModifyObjectAttributesMenuItem.setEnabled(count > 0);
         copyObjectsMenuItem.setEnabled(count > 0);
-        generatePublicGetUrls.setEnabled(count >= 1);
+        generatePublicGetUrls.setEnabled(count >= 1 && s3ServiceMulti.getAWSCredentials() != null);
         generateTorrentUrl.setEnabled(count == 1);
     }
 
@@ -1462,7 +1491,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
      * Starts a thread to run {@link S3ServiceMulti#listObjects}.
      */
     private void listObjects() {
-        if (getCurrentSelectedBucket() == null) {
+        if (currentSelectedBucket == null) {
             // Oops, better do nothing.
             return;
         }
@@ -1476,15 +1505,15 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
             }                        
         };
         
+        objectTableModel.removeAllObjects();
+        objectsSummaryLabel.setText(" ");        
+
         // This is all very convoluted, it was done this way to ensure we can display the dialog box.        
         runInBackgroundThread(new Runnable() {
             public void run() {
                 try {                    
-                    objectTableModel.removeAllObjects();
-                    objectsSummaryLabel.setText(" ");        
-
                     startProgressDialog(
-                        "Listing objects in " + getCurrentSelectedBucket().getName(),
+                        "Listing objects in " + currentSelectedBucket.getName(),
                         "", 0, 0, "Cancel bucket listing", cancelListener);
                     
                     final String prefix = filterObjectsPrefix.getText();
@@ -1494,12 +1523,12 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
                     String priorLastKey = null;
                     do {
                         S3ObjectsChunk chunk = s3ServiceMulti.getS3Service().listObjectsChunked(
-                            getCurrentSelectedBucket().getName(), prefix, delimiter, 
+                            currentSelectedBucket.getName(), prefix, delimiter, 
                             BUCKET_LIST_CHUNKING_SIZE, priorLastKey);
                         
                         final S3Object[] objects = chunk.getObjects();
                         for (int i = 0; i < objects.length; i++) {
-                            objects[i].setOwner(getCurrentSelectedBucket().getOwner());
+                            objects[i].setOwner(currentSelectedBucket.getOwner());
                         }                        
                         
                         priorLastKey = chunk.getPriorLastKey();
@@ -1507,7 +1536,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
 
                         updateProgressDialog(
                             "Listed " + allObjects.size() + " objects in " 
-                            + getCurrentSelectedBucket().getName(), "", 0);
+                            + currentSelectedBucket.getName(), "", 0);
                         
                         runInDispatcherThreadImmediately(new Runnable() {
                             public void run() {
@@ -1521,7 +1550,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
                         public void run() {
                             updateObjectsSummary(listingCancelled[0]);
                             S3Object[] allObjects = objectTableModel.getObjects();
-                            cachedBuckets.put(getCurrentSelectedBucket().getName(), allObjects);
+                            cachedBuckets.put(currentSelectedBucket.getName(), allObjects);
                         }
                     });                        
 
@@ -1589,20 +1618,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
         }
         bucketActionMenu.show(invoker, xPos, yPos);
     }
-    
-    /**
-     * @return the bucket currently selected in the gui, null if no bucket is selected.
-     */
-    private S3Bucket getCurrentSelectedBucket() {
-        if (bucketsTable.getSelectedRows().length == 0) {
-            return null;
-        } else {
-            return bucketTableModel.getBucket(
-                bucketTableModelSorter.modelIndex(
-                    bucketsTable.getSelectedRows()[0]));
-        }
-    }
-    
+        
     /**
      * Displays object-specific actions in a popup menu.
      * @param invoker the component near which the popup menu will be displayed
@@ -1610,7 +1626,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
      * @param yPos the mouse's vertical co-ordinate when the popup menu was invoked
      */
     private void showObjectPopupMenu(JComponent invoker, int xPos, int yPos) {
-        if (getCurrentSelectedBucket() == null || getSelectedObjects().length == 0) {
+        if (currentSelectedBucket == null || getSelectedObjects().length == 0) {
             return;
         }
         objectActionMenu.show(invoker, xPos, yPos);
@@ -1694,14 +1710,13 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
      *
      */
     private void deleteSelectedBucket() {
-        S3Bucket currentBucket = getCurrentSelectedBucket();
-        if (currentBucket == null) {
+        if (currentSelectedBucket == null) {
             log.warn("Ignoring delete bucket command, no currently selected bucket");
             return;
         }
         
         int response = JOptionPane.showConfirmDialog(ownerFrame, 
-            "Are you sure you want to delete '" + currentBucket.getName() + "'?",  
+            "Are you sure you want to delete '" + currentSelectedBucket.getName() + "'?",  
             "Delete Bucket?", JOptionPane.YES_NO_OPTION);
         
         if (response == JOptionPane.NO_OPTION) {
@@ -1709,8 +1724,9 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
         }
         
         try {
-            s3ServiceMulti.getS3Service().deleteBucket(currentBucket.getName());
-            bucketTableModel.removeBucket(currentBucket);
+            s3ServiceMulti.getS3Service().deleteBucket(currentSelectedBucket.getName());
+            bucketTableModel.removeBucket(currentSelectedBucket);
+            currentSelectedBucket = null;
         } catch (Exception e) {
             String message = "Unable to delete bucket";
             log.error(message, e);
@@ -1754,14 +1770,13 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
      */
     private void updateBucketAccessControlList() {
         try {
-            S3Bucket currentBucket = getCurrentSelectedBucket();
-            AccessControlList bucketACL = s3ServiceMulti.getS3Service().getBucketAcl(currentBucket);
+            AccessControlList bucketACL = s3ServiceMulti.getS3Service().getBucketAcl(currentSelectedBucket);
             
             AccessControlList updatedBucketACL = AccessControlDialog.showDialog(
-                ownerFrame, new S3Bucket[] {currentBucket}, bucketACL, this);
+                ownerFrame, new S3Bucket[] {currentSelectedBucket}, bucketACL, this);
             if (updatedBucketACL != null) {
-                currentBucket.setAcl(updatedBucketACL);
-                s3ServiceMulti.getS3Service().putBucketAcl(currentBucket);
+                currentSelectedBucket.setAcl(updatedBucketACL);
+                s3ServiceMulti.getS3Service().putBucketAcl(currentSelectedBucket);
             }
         } catch (Exception e) {
             String message = "Unable to update bucket's Access Control List";
@@ -1775,7 +1790,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
      */
     private void updateBucketRequesterPaysSetting() {
         try {
-            final S3Bucket selectedBucket = getCurrentSelectedBucket();
+            final S3Bucket selectedBucket = currentSelectedBucket;
             
             if (!selectedBucket.isRequesterPaysKnown()) {
                 selectedBucket.setRequesterPays( 
@@ -1837,13 +1852,14 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
     
     private void displayAclModificationDialog() {
         final HyperlinkActivatedListener hyperlinkListener = this;
+        final S3Bucket selectedBucket = currentSelectedBucket;
         
         runInBackgroundThread(new Runnable() {
             public void run() {
                 final S3Object[] selectedObjects = getSelectedObjects();            
                 
                 boolean aclLookupSucceeded = s3ServiceMulti.getObjectACLs(
-                    getCurrentSelectedBucket(), selectedObjects);
+                    selectedBucket, selectedObjects);
                 
                 if (!aclLookupSucceeded) {
                     return;
@@ -1877,7 +1893,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
                         selectedObjects[i].setAcl(updatedObjectACL[0]);
                     }                            
                     // Perform ACL updates.
-                    s3ServiceMulti.putACLs(getCurrentSelectedBucket(), selectedObjects);                
+                    s3ServiceMulti.putACLs(selectedBucket, selectedObjects);                
                 }
             }    
         });
@@ -2015,8 +2031,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
                         return;
                     }
 
-                    s3ServiceMulti.downloadObjects(getCurrentSelectedBucket(),
-                        downloadPackages);
+                    s3ServiceMulti.downloadObjects(currentSelectedBucket, downloadPackages);
 
                 } catch (final Exception e) {
                     runInDispatcherThreadImmediately(new Runnable() {
@@ -2089,7 +2104,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
                         }
                         
                         // Upload the files.
-                        s3ServiceMulti.putObjects(getCurrentSelectedBucket(), uploadObjects);
+                        s3ServiceMulti.putObjects(currentSelectedBucket, uploadObjects);
                         
                    } catch (final Exception e) {
                        runInDispatcherThreadImmediately(new Runnable() {
@@ -2473,7 +2488,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
                 public void run() {            
                     for (int i = 0; i < event.getCreatedObjects().length; i++) {
                         S3Object object = event.getCreatedObjects()[i];
-                        object.setBucketName(getCurrentSelectedBucket().getName());
+                        object.setBucketName(currentSelectedBucket.getName());
                         objectTableModel.addObject(object);
                     }
                     if (event.getCreatedObjects().length > 0) {
@@ -2519,7 +2534,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
                 public void run() {
                     updateObjectsSummary(false);
                     S3Object[] allObjects = objectTableModel.getObjects();
-                    cachedBuckets.put(getCurrentSelectedBucket().getName(), allObjects);
+                    cachedBuckets.put(currentSelectedBucket.getName(), allObjects);
                 }
             });                        
         }
@@ -2551,7 +2566,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
             
             dialog.setVisible(true);                                        
             if (dialog.isCopyActionApproved()) {
-                final String currentBucketName = getCurrentSelectedBucket().getName();
+                final String currentBucketName = currentSelectedBucket.getName();
                 final String destinationBucketName = dialog.getDestinationBucketName();
                 final String[] sourceObjectKeys = dialog.getSourceObjectKeys();
                 final S3Object[] destinationObjects = dialog.getDestinationObjects();
@@ -2568,7 +2583,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
                         if (retainAcls) {
                             // Retain ACL settings from original objects.
                             if (!s3ServiceMulti.getObjectACLs(
-                                getCurrentSelectedBucket(), sourceObjects)) 
+                                currentSelectedBucket, sourceObjects)) 
                             {
                                 return;
                             }
@@ -2588,7 +2603,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
                                 sourceObjects[i] = new S3Object(sourceObjectKeys[i]);
                             }
                             
-                            s3ServiceMulti.deleteObjects(getCurrentSelectedBucket(), sourceObjects);
+                            s3ServiceMulti.deleteObjects(currentSelectedBucket, sourceObjects);
                         }
                         if (destinationBucketName.equals(currentBucketName) || isDeleteAfterCopy) {
                             // Refesh object listing for current bucket if the bucket's contents
@@ -2670,7 +2685,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
 
         // Generate URL
         String torrentUrl = S3Service.createTorrentUrl(
-            getCurrentSelectedBucket().getName(), currentObject.getKey());
+            currentSelectedBucket.getName(), currentObject.getKey());
         
         // Display signed URL
         JOptionPane.showInputDialog(ownerFrame,
@@ -2699,13 +2714,13 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
 
         runInBackgroundThread(new Runnable() {
            public void run() {
-               s3ServiceMulti.deleteObjects(getCurrentSelectedBucket(), objects);
+               s3ServiceMulti.deleteObjects(currentSelectedBucket, objects);
 
                runInDispatcherThreadImmediately(new Runnable() {
                    public void run() {
                        updateObjectsSummary(false);
                        S3Object[] allObjects = objectTableModel.getObjects();
-                       cachedBuckets.put(getCurrentSelectedBucket().getName(), allObjects);
+                       cachedBuckets.put(currentSelectedBucket.getName(), allObjects);
                    }
                });
            } 
@@ -2789,7 +2804,7 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
         final S3Object[] incompleteObjects = (S3Object[]) s3ObjectsIncompleteList
             .toArray(new S3Object[s3ObjectsIncompleteList.size()]);  
         
-        return s3ServiceMulti.getObjectsHeads(getCurrentSelectedBucket(), incompleteObjects);
+        return s3ServiceMulti.getObjectsHeads(currentSelectedBucket, incompleteObjects);
     }
     
     /**
@@ -3003,6 +3018,9 @@ public class Cockpit extends JApplet implements S3ServiceEventListener, ActionLi
      * @throws Exception
      */
     public static void main(String args[]) throws Exception {
+        // When running on OS X, display app menu in the right place (i.e. not the app window) 
+        System.setProperty("apple.laf.useScreenMenuBar", "true");
+        
         JFrame ownerFrame = new JFrame("JetS3t Cockpit");
         ownerFrame.addWindowListener(new WindowListener() {
             public void windowOpened(WindowEvent e) {

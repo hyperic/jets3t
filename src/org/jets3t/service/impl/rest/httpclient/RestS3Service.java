@@ -531,7 +531,7 @@ public class RestS3Service extends S3Service implements SignedUrlHandler, AWSReq
 
         // If we are using an alternative hostname, include the hostname/bucketname in the resource path.
         if (!Constants.S3_HOSTNAME.equals(hostname)) {
-            int subdomainOffset = hostname.indexOf("." + Constants.S3_HOSTNAME);
+            int subdomainOffset = hostname.lastIndexOf("." + Constants.S3_HOSTNAME);
             if (subdomainOffset > 0) {
                 // Hostname represents an S3 sub-domain, so the bucket's name is the CNAME portion
                 fullUrl = "/" + hostname.substring(0, subdomainOffset) + httpMethod.getPath();                    
@@ -1234,6 +1234,11 @@ public class RestS3Service extends S3Service implements SignedUrlHandler, AWSReq
             log.debug("Creating Object with key " + object.getKey() + " in bucket " + bucketName);
         }
 
+        // We do not need to calculate the data MD5 hash during upload if the 
+        // expected hash value was provided as the object's Content-MD5 header.                                
+        boolean isLiveMD5HashingRequired = 
+            (object.getMetadata(S3Object.METADATA_HEADER_CONTENT_MD5) == null);        
+        
         RequestEntity requestEntity = null;
         if (object.getDataInputStream() != null) {
             if (object.containsMetadata("Content-Length")) {
@@ -1242,7 +1247,7 @@ public class RestS3Service extends S3Service implements SignedUrlHandler, AWSReq
                 }
                 requestEntity = new RepeatableRequestEntity(object.getKey(),                     
                     object.getDataInputStream(), object.getContentType(), object.getContentLength(),
-                    this.jets3tProperties);
+                    this.jets3tProperties, isLiveMD5HashingRequired);
             } else {
                 // Use InputStreamRequestEntity for objects with an unknown content length, as the
                 // entity will cache the results and doesn't need to know the data length in advance.
@@ -1274,7 +1279,7 @@ public class RestS3Service extends S3Service implements SignedUrlHandler, AWSReq
         // Note that we can only confirm the data if we used a RepeatableRequestEntity to
         // upload it, if the user did not provide a content length with the original
         // object we are SOL.
-        if (object.getMetadata(S3Object.METADATA_HEADER_CONTENT_MD5) == null) {
+        if (isLiveMD5HashingRequired) {
             if (requestEntity instanceof RepeatableRequestEntity) {
                 // Obtain locally-calculated MD5 hash from request entity.
                 String hexMD5OfUploadedData = ServiceUtils.toHex(
@@ -1689,15 +1694,49 @@ public class RestS3Service extends S3Service implements SignedUrlHandler, AWSReq
             throw new IllegalStateException("Content-Length must be specified for objects put using signed PUT URLs");
         }
         
+        RepeatableRequestEntity repeatableRequestEntity = null;
+        
+        // We do not need to calculate the data MD5 hash during upload if the 
+        // expected hash value was provided as the object's Content-MD5 header.                                
+        boolean isLiveMD5HashingRequired = 
+            (object.getMetadata(S3Object.METADATA_HEADER_CONTENT_MD5) == null);
+
         if (object.getDataInputStream() != null) {
-            putMethod.setRequestEntity(new RepeatableRequestEntity(object.getKey(),
-                object.getDataInputStream(), object.getContentType(), object.getContentLength(), this.jets3tProperties));
+            repeatableRequestEntity = new RepeatableRequestEntity(object.getKey(),
+                object.getDataInputStream(), object.getContentType(), object.getContentLength(), 
+                this.jets3tProperties, isLiveMD5HashingRequired);
+            
+            putMethod.setRequestEntity(repeatableRequestEntity);
         }
 
         performRequest(putMethod, 200);
 
         // Consume response data and release connection.
         putMethod.releaseConnection();
+        
+        // Confirm that the data was not corrupted in transit by checking S3's calculated 
+        // hash value with the locally computed value. This is only necessary if the user
+        // did not provide a Content-MD5 header with the original object.
+        // Note that we can only confirm the data if we used a RepeatableRequestEntity to
+        // upload it, if the user did not provide a content length with the original
+        // object we are SOL.
+        if (repeatableRequestEntity != null && isLiveMD5HashingRequired) {
+            // Obtain locally-calculated MD5 hash from request entity.
+            String hexMD5OfUploadedData = ServiceUtils.toHex(
+                ((RepeatableRequestEntity)repeatableRequestEntity).getMD5DigestOfData());
+            
+            // Compare our locally-calculated hash with the ETag returned by S3.
+            if (!object.getETag().equals(hexMD5OfUploadedData)) {
+                throw new S3ServiceException("Mismatch between MD5 hash of uploaded data ("
+                    + hexMD5OfUploadedData + ") and ETag returned by S3 (" + object.getETag() + ") for: "
+                    + object.getKey());
+            } else {
+                if (log.isDebugEnabled()) {
+                    log.debug("Object upload was automatically verified, the calculated MD5 hash "+ 
+                        "value matched the ETag returned by S3: " + object.getKey());
+                }
+            }
+        }                
 
         try {
             S3Object uploadedObject = ServiceUtils.buildObjectFromUrl(putMethod.getURI().getHost(), putMethod.getPath());

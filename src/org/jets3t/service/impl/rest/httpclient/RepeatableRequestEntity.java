@@ -68,7 +68,8 @@ public class RepeatableRequestEntity implements RequestEntity {
     private static volatile long bytesWrittenThisSecond = 0;
     private static volatile long currentSecondMonitored = 0;
     private static final Random random = new Random();    
-    
+
+    private boolean isLiveMD5HashingEnabled = true;
     private byte[] dataMD5Hash = null;
 
     /**
@@ -88,11 +89,16 @@ public class RepeatableRequestEntity implements RequestEntity {
      * 
      * 
      * @param is
+     * the input stream that supplies the data to be made repeatable.
      * @param contentType
      * @param contentLength
+     * @param enableLiveMD5Hashing
+     * if true, data that passes through the object will be hashed to an MD5 digest
+     * and this digest will be available from {@link #getMD5DigestOfData()}. If false,
+     * the digest will not be calculated.
      */
     public RepeatableRequestEntity(String name, InputStream is, String contentType, 
-        long contentLength, Jets3tProperties jets3tProperties) 
+        long contentLength, Jets3tProperties jets3tProperties, boolean enableLiveMD5Hashing) 
     {
         if (is == null) {
             throw new IllegalArgumentException("InputStream cannot be null");
@@ -101,6 +107,7 @@ public class RepeatableRequestEntity implements RequestEntity {
         this.name = name;
         this.contentLength = contentLength;
         this.contentType = contentType;
+        this.isLiveMD5HashingEnabled = enableLiveMD5Hashing;
         
         InputStream inputStream = is;
         while (true) {
@@ -148,11 +155,17 @@ public class RepeatableRequestEntity implements RequestEntity {
      * @param is
      * @param contentType
      * @param contentLength
+     * @param enableLiveMD5Hashing
+     * if true, data that passes through the object will be hashed to an MD5 digest
+     * and this digest will be available from {@link #getMD5DigestOfData()}. If false,
+     * the digest will not be calculated.
      */
-    public RepeatableRequestEntity(String name, InputStream is, String contentType, long contentLength) 
+    public RepeatableRequestEntity(String name, InputStream is, String contentType, 
+        long contentLength, boolean enableLiveMD5Hashing) 
     {
         this(name, is, contentType, contentLength, 
-            Jets3tProperties.getInstance(Constants.JETS3T_PROPERTIES_FILENAME));
+            Jets3tProperties.getInstance(Constants.JETS3T_PROPERTIES_FILENAME),
+            enableLiveMD5Hashing);
     }
     
     public long getContentLength() {
@@ -198,15 +211,17 @@ public class RepeatableRequestEntity implements RequestEntity {
         }
         
         MessageDigest messageDigest = null;
-        try {
-            messageDigest = MessageDigest.getInstance("MD5");
-        } catch (NoSuchAlgorithmException e) {
-        	if (log.isWarnEnabled()) {
-        		log.warn("Unable to calculate MD5 hash of data sent as algorithm is not available", e);
-        	}
+        if (isLiveMD5HashingEnabled) {
+            try {
+                messageDigest = MessageDigest.getInstance("MD5");
+            } catch (NoSuchAlgorithmException e) {
+            	if (log.isWarnEnabled()) {
+            		log.warn("Unable to calculate MD5 hash of data sent as algorithm is not available", e);
+            	}
+            }
         }
         
-        byte[] tmp = new byte[1024];
+        byte[] tmp = new byte[16384];
         int count = 0;
 
         while ((count = this.is.read(tmp)) >= 0) {

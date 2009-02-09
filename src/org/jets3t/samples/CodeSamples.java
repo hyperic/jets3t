@@ -40,6 +40,7 @@ import org.jets3t.service.model.S3Object;
 import org.jets3t.service.multithread.DownloadPackage;
 import org.jets3t.service.multithread.S3ServiceSimpleMulti;
 import org.jets3t.service.security.AWSCredentials;
+import org.jets3t.service.security.AWSDevPayCredentials;
 import org.jets3t.service.utils.ServiceUtils;
 
 /**
@@ -656,7 +657,7 @@ public class CodeSamples {
             inputFields, null, true);
         
         /*
-         * Activate the Requester Pays feature for a bucket.
+         * Activate Requester Pays for a bucket.
          */
         
         // A bucket in S3 is normally configured such that the bucket's owner
@@ -692,8 +693,9 @@ public class CodeSamples {
         // the RequesterPaysEnabled flag to true in your RestS3Service class.
         // You can then use the service to list, upload, or download objects as 
         // normal.
-        // Support for Requester Pays buckets is enabled by default with the
-        // jets3t.properties setting 'httpclient.requester-pay-buckets-enabled'
+        // Support for Requester Pays buckets is disabled by default in JetS3t 
+        // with the jets3t.properties setting 
+        // 'httpclient.requester-pays-buckets-enabled=false'
         s3Service.setRequesterPaysEnabled(true);
         
         /*
@@ -718,6 +720,36 @@ public class CodeSamples {
                 httpHeaders,
                 awsCredentials, expirySecsAfterEpoch, 
                 isVirtualHost, isHttpsUrl);
+        
+        /*
+         * Accessing Amazon DevPay S3 accounts
+         */
+        
+        // Amazon's DevPay service allows vendors to sell user-pays S3 accounts.
+        // To access the S3 portions of a DevPay product, JetS3t needs
+        // additional credentials that include the DevPay User Token, and the
+        // DevPay Product Token.
+        
+        AWSDevPayCredentials devPayCredentials = new AWSDevPayCredentials(
+            "YOUR_AWS_ACCESSS_KEY", "YOUR_AWS_SECRET_KEY",
+            "DEVPAY_USER_TOKEN", "DEVPAY_PRODUCT_TOKEN");
+        
+        // Once you have defined your DevPay S3 credentials, you can create an
+        // S3Service class based on these and access the DevPay account as usual.
+        S3Service devPayService = new RestS3Service(devPayCredentials);
+        devPayService.listAllBuckets();
+        
+        // You can also generate signed URLs for DevPay S3 accounts. Here is the
+        // code to generate a linke that makes an object in a DevPay account 
+        // temporary available for public download.
+        
+        cal = Calendar.getInstance();
+        cal.add(Calendar.MINUTE, 5);
+        
+        String signedDevPayUrl = S3Service.createSignedGetUrl(
+            "devpay-bucket-name", "devpay-object-name", 
+            devPayCredentials, cal.getTime());
+        
     }
     
 }

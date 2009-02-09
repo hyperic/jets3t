@@ -87,6 +87,9 @@ public class S3Object extends BaseS3Object implements Cloneable {
      * (see {@link Mimetypes}), and a content length matching the file's size.
      * The file's MD5 hash value is also calculated and provided to S3, so the service
      * can verify that no data are corrupted in transit.
+     * <p>
+     * <b>NOTE:</b> The automatic calculation of a file's MD5 hash digest as performed by
+     * this constructor could take some time for large files, or for many small ones. 
      * 
      * @param bucket
      * the bucket the object belongs to, or will be placed in.
@@ -114,6 +117,9 @@ public class S3Object extends BaseS3Object implements Cloneable {
      * string's length.
      * The given string's MD5 hash value is also calculated and provided to S3, so the service
      * can verify that no data are corrupted in transit.
+     * <p>
+     * <b>NOTE:</b> The automatic calculation of the MD5 hash digest as performed by
+     * this constructor could take some time for large strings, or for many small ones. 
      * 
      * @param bucket
      * the bucket the object belongs to, or will be placed in.

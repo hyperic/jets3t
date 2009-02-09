@@ -25,9 +25,12 @@ import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
+import javax.swing.AbstractAction;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JPanel;
+import javax.swing.KeyStroke;
 
 import org.jets3t.gui.ErrorDialog;
 import org.jets3t.gui.HyperlinkActivatedListener;
@@ -86,6 +89,19 @@ public class AWSCredentialsDialog extends JDialog implements ActionListener {
         this.getContentPane().add(buttonsPanel, new GridBagConstraints(0, 1, 
             1, 1, 1, 0, GridBagConstraints.CENTER, GridBagConstraints.HORIZONTAL, insetsDefault, 0, 0));
         
+        // Set default ENTER and ESCAPE buttons.
+        this.getRootPane().setDefaultButton(okButton);        
+        this.getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+            .put(KeyStroke.getKeyStroke("ESCAPE"), "ESCAPE");
+        this.getRootPane().getActionMap().put("ESCAPE", new AbstractAction() {
+            private static final long serialVersionUID = -6225706489569112809L;
+
+            public void actionPerformed(ActionEvent actionEvent) {
+                isConfirmed = false;                
+                setVisible(false);            
+            }
+        });        
+        
         this.pack();
         this.setResizable(false);
         this.setLocationRelativeTo(ownerFrame);
@@ -107,8 +123,11 @@ public class AWSCredentialsDialog extends JDialog implements ActionListener {
 
                 ErrorDialog.showDialog(this, null, errorMessages, null);                
             }            
+        } else if ("Cancel".equals(e.getActionCommand())) {
+            isConfirmed = false;                
+            this.setVisible(false);            
         }
-    }
+     }
     
     /**
      * @return

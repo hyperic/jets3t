@@ -64,6 +64,8 @@ CP=$CP:$JETS3T_HOME/libs/misc/BareBonesBrowserLaunch.jar
 CP=$CP:$JETS3T_HOME/libs/logging-log4j/log4j-1.2.15.jar
 CP=$CP:$JETS3T_HOME/libs/bouncycastle/bcprov-jdk14-138.jar
 
+OSX_APP_NAME=-Xdock:name="JetS3t Cockpit-Lite"
+
 # OutOfMemory errors? Increase the memory available by changing -Xmx128M
 
-"$EXEC" -Xmx128M -classpath "$CP" org.jets3t.apps.cockpitlite.CockpitLite
+"$EXEC" -Xmx128M -classpath "$CP" "$OSX_APP_NAME" org.jets3t.apps.cockpitlite.CockpitLite

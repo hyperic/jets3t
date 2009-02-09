@@ -1,150 +1,19 @@
 <html>
 <head>
-<title>JetS3t - Cockpit  (0.4.0)</title>
+<title>jets3t - Cockpit Guide</title>
 <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
 </head>
 
 <body bgcolor="#FFFFFF" text="#000000">
 
-<h2>Warning: Obsolete web page</h2>
 <p>
-This page is obsolete as of the release of JetS3t version 0.5.0.
+Sorry, this page is no longer available.
 </p>
 <p>
 Please visit the new 
-<a href="http://jets3t.s3.amazonaws.com/index.html">JetS3t Home</a> public website where the
-latest version of Cockpit is available.
+<a href="http://jets3t.s3.amazonaws.com/index.html">JetS3t Home</a> public website, or 
+return to the <a href="index.html">JetS3t Development</a> homepage.
 </p>
-
-<center><h1>Cockpit Guide - Version 0.4.0</h1></center>
-
-<p>
-Cockpit is a graphical Java application for viewing and managing the contents of an <a href="http://s3.amazonaws.com">Amazon S3</a> account.</p>
-<p>It is freely available as part of the <a href="http://jets3t.dev.java.net">jets3t</a> project which provides applications and a Java toolkit for Amazon's S3.
-<p>Cockpit can also be run as an online applet at <a href="http://jets3t.s3.amazonaws.com/index.html">Cockpit Online</a>.</p>
-
-<img src="images/cockpit.jpg">
-
-<p>
-Cockpit offers the following capabilities:
-<ul>
-<li>Create, view and delete <a href="#buckets">buckets</a> in your Amazon S3 account</li>
-<li><a href="#uploads">Upload files</a> to S3 using drag-and-drop</li>
-<li>Automatically <a href="#ulprefs">compress (gzip)</a> files sent to S3</li>
-<li>Automatically <a href="#ulprefs">password-encrypt</a> files sent to S3</li>
-<li><a href="#downloads">Download files</a> from S3 (not drag-and-drop compatible)</li>
-<li>Sophisticated <a href="#filecomparisions">file comparisons</a> used to determine whether files have changed, allowing the user to decide how clashes should be handled</li>
-<li>Control <a href="#acls">Access Control List (ACL) permissions</a> for buckets and objects</li>
-<li>Easily generate <a href="#signedurls">time-limited URLs</a> to make private objects publicly available</li>
-<li>Manage buckets owned by others (provided you have the necessary ACL permissions)</li>
-<li><a href="#login">Store your AWS login credentials</a> in password-protected files</li>
-</ul>
-<p>
-
-<h2>Getting Started</h2>
-<p>Cockpit may be run as a stand-alone application or as a browser applet.</p>
-<p>To run the browser applet visit <a href="http://jets3t.s3.amazonaws.com/index.html">Cockpit Online</a>.</p>
-<p>To obtain the stand-alone version download the <a href="http://jets3t.dev.java.net/index.html">jets3t distribution</a> and unzip the archive on your machine. Cockpit can then be run by double-clicking on the file <tt>cockpit.jar</tt>, or running one of the included cockpit start scripts.</p>
-
-<h3><a name="login">Log in to S3</a></h3>
-
-<p>To log in to S3 choose the menu item <b>Service -> Log in...</b>. The login dialog will be displayed for you to provide your AWS Access Key and Secret Key credentials.</p>
-<p>The login dialog offers a choice of two ways to provide your credentials. If you choose the "Login Directly" tab you can simply provide your access and secret keys.</p>
-<img src="images/login_direct.jpg">
-<p>Alternately, on the "Remembered Logins" tab you can choose to have your credentials remembered to make logins easier in the future.</p>
-<img src="images/login_remembered.jpg">
-<p>On this tab you enter your name, your AWS credentials and a password. When you click <b>Remember this login</b> Cockpit will save your credentials in a password-encrypted file and display your name in the Remembered Logins table. Now you can log in by choosing your name from the list, clicking <b>Log in</b> and entering your password.</p>
-<p>If you later wish to remove your remembered login credentials, select your name in the list and click the <b>Forget this login</b> button.</p>
-
-<h3><a name="buckets">Manage your buckets</a></h3>
-<p>Once you have logged in to S3 you can manage your buckets. Upon log in all your buckets will automatically be displayed in Cockpit's left pane. If your buckets list is empty, it's about time you created a bucket!</p>
-<p>To create a bucket, choose the menu item <b>Buckets -> Create new bucket...</b>. You will be prompted to name your bucket. Notice that the default new bucket name includes your Amazon S3 ID string. It is a good idea to leave this string as a prefix for your bucket names to ensure your names are unique in the S3 system.</p>
-<img src="images/create_bucket.jpg">
-<p>When you select a bucket name in the left pane, Cockpit will contact S3 and retrieve the list of objects stored in that bucket. This list will be displayed in the right-hand pane. </p>
-
-<h4>Buckets menu</h4>
-<img src="images/menu_buckets.jpg">
-<p>Aside from allowing you to create buckets, the Buckets menu shows all the operations you can perform on your buckets. For convenience a context menu can also be displayed if you right-click a bucket, though this menu does not include all the operations available in the main menu bar.<p>
-<p>Note that some menu options will only be available when you have selected a bucket, otherwise they will be greyed out.</p>
-
-<p><b>Refresh bucket listing</b>: Cockpit caches the listing of buckets it receives when you first log in. Use this menu item to refresh your bucket listing manually to be sure the listing is up-to-date.</p>
-<p><b>View bucket properties...</b>: Displays the bucket's properties such as the creation date.</p>
-<p><b>Create new bucket...</b>: Creates a new bucket with the name provided</p>
-<p><b>Update bucket's Access Control List...</b>: Allows you to change the access permissions of the bucket (see <a href="#acls">Access Control Lists</a>)</p>
-<p><b>Add third-party bucket...</b>: A third-party bucket is one owned by someone else but which they have made accessible to you. You can manually add third-party buckets to your listing with this menu item, and once you have done so you can perform whatever operations you like provided you have the necessary permissions. For example, the <u>jets3t</u> bucket containing <a href="http://jets3t.s3.amazonaws.com/index.html">Cockpit Online</a> is publicly readable, so you can add this to your bucket listing. However we haven't allowed you to do anything but look, sorry...</p>
-<p><b>Delete selected bucket...</b>: Deletes the bucket after prompting for confirmation. Note that you can only delete empty buckets, so you will get an error message if you try and delete a bucket containing any objects.</p>
-
-<h3><a name="objects">Manage your objects</a></h3>
-<p>Once you have logged in to S3 and selected a bucket in Cockpit, the objects contained in that bucket are displayed in the right-hand pane. This object listing is cached by Cockpit so it doesn't have to contact S3 every time you select a bucket. If the object listing gets out-of-date, for example if another application or user has updated your objects, you can refresh the object listing with the menu item <b>Objects -> Refresh object listing</b></p>
-<p>Like the Buckets menu, the <b>Objects</b> menu shows all the operations you can perform on objects, though some operations will only be available if there is an object selected. There is also a reduced context menu available if you right-click on an object.</p>
-
-<h4>Objects menu</h4>
-<img src="images/menu_objects.jpg">
-
-<p><b>Refresh object listing</b>: Refreshes Cockpit's cached list of objects</p>
-<p><b>View object properties...</b>: Displays the object's properties, such as the object's size, content type, and all metadata items. <b>NOTE:</b> this menu item is only available if a single object is selected at a time.</p>
-<p><b>Update selected object(s) Access Control List(s)...</b>: Allows you to change the access permissions of the object (see <a href="#acls">Access Control Lists</a>)</p>
-<p><b>Download selected object(s)...</b>: This menu item will prompt for a target directory, then download all the selected objects into that directory. If the objects being downloaded were stored in a directory structure (eg if you uploaded a directory containing other directories and files) that directory structure will be re-created in the target location.</p>
-<p><b>Generate Public URL...</b>: This menu item allows you to generate a time-limited URL string that can be used by anyone to access a private object, but only up until the time you specify. This operation will prompt you for the number of hours until the URL will expire (the number can be a fraction, eg 0.5 for 30 minutes) and will generate the appropriate signed URL. See <a href="#signedurls">Time-limited URLs</a>.</p>
-<p><b>Generate Torrent URL...</b>: This menu item generates a URL that will make an object available via the BitTorrent protocol. If you save the Torren tdocument returned from this URL, you can open it in a BitTorrent client.</p>
-<p><b>Delete selected object(s)</b>: Deletes the currently selected object or objects, after prompting for confirmation.</p>
-
-<h3><a name="uploads">Upload files to S3</a></h3>
-<p>You upload files to S3 by selecting a target bucket, then using drag-and-drop to place one or more files/folders over the right-hand object pane. Cockpit examines the files (this may take some time for large files) then uploads them to S3 provided there are no clashes (see <a href="#comparisons">Automatic File Comparisons</a>)</p>
-<p>Cockpit displays a progress dialog during uploads showing how much of the total data has been uploaded. Uploads can be cancelled at any time.</p>
-<p>If a folder is uploaded, Cockpit will upload the folder and all its contents to S3 and store enough information to re-create the folder structure exactly. It does this by creating an empty object for each folder or sub-folder, and tagging the object with the content type <tt>application/x-directory</tt>.</p>
-
-<h4><a name="ulprefs">Compressing and/or Encrypting Uploads (Preference menu)</a></h4>
-<img src="images/menu_preferences.jpg">
-<p>The Preferences menu only applies to file uploads.<p>
-<p>The menu allows you to set the options of Gzipping and/or Encrypting all files uploaded to S3. Gzipping (compressing) files may save space in S3 and reduce the time taken for uploads, provided the files compress well (movies and mp3 files do not compress well.</p>
-<p>Encrypting files may help to protect sensitive information, especially if you don't trust the operators of S3. The encryption relies on a password you provide, and files will only be readable by someone with that password. Beware of using more than one password in a bucket, as Cockpit is only smart enough to handle one password at a time when downloading. <b>NOTE</b>: jets3t does not presume to offer industrial-strength encryption. We use secure algorithms (Triple DES/CBC/PKCS5) but we are not security experts. If you are really paranoid about your data, you should encrypt files yourself with a serious crypto package before uploading them to S3.</p>
-<p>Preferences are not saved by Cockpit, and will have to be re-set each time you run the application.</p>
-
-<h3><a name="downloads">Download files from S3</a></h3>
-<p>Cockpit does not support drag-and-drop copying of files from S3 to your computer - unfortunately Java makes this infeasible. To download objects from S3 you must select the objects you want, then choose the menu item <b>Objects -> Download selected object(s)</b>
-<p>If you download objects contained in a folder structure, that folder structure will be re-created on your computer (provided the files were initially uploaded with a jets3t tool).</p>
-<p>Cockpit will automatically unzip GZipped objects, and decrypt Encrypted objects (promting you for the password if necessary)</p>
-<p>Before downloading, Cockpit will compare any files present in the target location against the objects in S3 and detect any clashes (see <a href="#comparisons">Automatic File Comparisons</a>)</p>
-
-<h3><a name="acls">Access Control Lists</a></h3>
-<p>Amazon S3 uses Access Control List (ACL) settings to control who may access or modify items stored in S3. By default, all buckets and objects created in S3 are accessible only to the account owner.</p>
-<p>Cockpit allows object owners to change the ACL settings for their objects by selecting the Update Access Control List menu item in the bucket or object menus. ACL settings are managed in the Update Access Control List dialog.</p>
-<img src="images/acl.jpg"/>
-<p>The default ACL setting is for the object's creator, represented by a Canonical ID, to have Full control.</p>
-<p>The most common ACL change is to allow public access to a bucket or object. An object is made publicly accessible in S3 by granting READ access to members of the All Users group. To do this:</p>
-<ol>
-<li>click the plus (+) button underneath the Group table, to add a new Group permission</li>
-<li>make sure the Group URI is set to <tt>http://acs.amazonaws.com/groups/global/AllUsers</tt></li>
-<li>make sure the Permission option is set to <tt>READ</tt></li>
-<li>click the <b>Save Permission Changes button</b></li>
-</ol>
-<p>Note that objects may also be made publicly available for a limited time using <a href="#signedurls">Time-limited URLs</a>.</p>
-<p>All ACL combinations supported by Amazon S3 can be set using this dialog box. However this is a complex topic and we won't deal with it here, please refer to Amazon's technical documentation for more information about the use of Access Control Lists.</p>
-
-<h3><a name="filecomparisions">Automatic File Comparisons</a></h3>
-<p>Cockpit automatically compares files that are being uploaded or downloaded with files in the destination to detect clashes. When a file with the same name exists on the target, Cockpit determines whether the file has changed, and if so which version of the file is the most recent.</p>
-<p>Each file is given one of the following status types:</p>
-<ul>
-<li>New File: The file does not exist in the destination</li>
-<li>Unchanged: The file is identical to the copy in the destination</li>
-<li>Changed: The file has been changed</li>
-</ul>
-<p>If there are Unchanged or Changed files, the <b>Replace file(s)</b> dialog is displayed.</p>
-<img src="images/filecomparisons.jpg">
-<p>This dialog allows you to choose which clashing files in the destination should be replaced, if any. The options available may include the following:</p>
-<ul>
-<li>Only upload/download new file(s): Only files that do not already exist in the destination will be uploaded or downloaded</li>
-<li>Upload/download new and changed file(s): New files and changed files will be transferred, but files that are unchanged will not be transferred. This is the default option</li>
-<li>Upload/Download all files: All the files will be uploaded or downloaded, regardless of what files are in the destination</li>
-</ul>
-<p>File comparisons are done using MD5 hashes of the file contents.</p>
-
-<h3><a name="signedurls">Time-limited URLs</a></h3>
-<p>A private object stored in S3 can be made publicy available for a limited time using a signed URL. The signed URL can be used by anyone to download the object, and after a chosen time the URL will no longer work.</p>
-<p>Time limited URLs are created using the <b>Objects -> Generate Public URL...</b> menu item. A dialog is displayed prompting for the number of hours until the URL will expire. This number can be a fraction, for example the value 0.5 will create a URL which works for half an hour.</p>
-<img src="images/genurl.jpg">
-<p>After providing the number of hours the Signed URL dialog box will display with a lengthly URL. This URL will work in any web browser, but only for the length of time you specified. Send this URL to the person who needs the object.</p>
 
 </body>
 </html>

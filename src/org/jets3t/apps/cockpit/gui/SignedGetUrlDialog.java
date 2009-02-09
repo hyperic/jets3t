@@ -104,7 +104,7 @@ public class SignedGetUrlDialog extends JDialog implements ActionListener, Docum
         JHtmlLabel requesterPaysLabel = new JHtmlLabel("<html><b>Bucket is Requester Pays?</b></html>", hyperlinkListener);
         requesterPaysLabel.setHorizontalAlignment(JLabel.RIGHT);        
         
-        expiryTimeTextField = new JTextField();
+        expiryTimeTextField = new JTextField("1.0");
         expiryTimeTextField.setToolTipText("How long in hours until the URL will expire");
         expiryTimeTextField.getDocument().addDocumentListener(this);
 
@@ -170,11 +170,11 @@ public class SignedGetUrlDialog extends JDialog implements ActionListener, Docum
         this.getContentPane().add(panel, new GridBagConstraints(0, 0, 
             1, 1, 1, 1, GridBagConstraints.CENTER, GridBagConstraints.BOTH, insetsDefault, 0, 0));        
         
-        this.setSize(760, 500);        
+        this.setSize(700, 450);        
         this.setResizable(true);
         this.setLocationRelativeTo(ownerFrame);
 
-        expiryTimeTextField.setText("1.0");
+        generateSignedUrls();            
     }
     
     public void actionPerformed(ActionEvent event) {

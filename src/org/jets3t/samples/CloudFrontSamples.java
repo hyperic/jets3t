@@ -81,9 +81,14 @@ public class CloudFrontSamples {
             testDistributionId, new String[] {}, "Deleting distribution", false);
         System.out.println("Disabled Distribution Config: " + disabledDistributionConfig);
 
+        // Check whether a distribution is deployed
+        Distribution distribution = cloudFrontService.getDistributionInfo(testDistributionId);
+        System.out.println("Distribution is deployed? " + distribution.isDeployed());
+
         // Delete a distribution (the distribution must be disabled and deployed first)
         cloudFrontService.deleteDistribution(testDistributionId);
         */
+        
     }
     
 }

@@ -358,7 +358,7 @@ public class ManageDistributionsDialog extends JDialog implements ActionListener
                         
                         SwingUtilities.invokeLater(new Runnable() {
                             public void run() {
-                                progressDialog.startDialog("Deletingdistribution: " + distribution.getDomainName(), 
+                                progressDialog.startDialog("Deleting distribution: " + distribution.getDomainName(), 
                                     null, 0, 0, null, null);                               
                             }
                          });

@@ -41,10 +41,16 @@ public class BucketTableModel extends DefaultTableModel {
     private GuiUtils guiUtils = new GuiUtils();
     private ArrayList bucketList = new ArrayList();
     
+    private boolean includeDistributions = false;
     private Icon distributionActiveIcon = null;
     
-    public BucketTableModel() {
-        super(new String[] {"Bucket Name", ""}, 0);
+    public BucketTableModel(boolean includeDistributions) {
+        super(includeDistributions 
+            ? new String[] {"Bucket Name", ""}
+            : new String[] {"Bucket Name"}, 
+            0);
+        
+        this.includeDistributions = includeDistributions;
         
         JLabel dummyLabel = new JLabel();
         if (guiUtils.applyIcon(dummyLabel, "/images/nuvola/16x16/actions/irkick.png"))
@@ -77,11 +83,12 @@ public class BucketTableModel extends DefaultTableModel {
         }
         // New object to insert.
         bucketList.add(insertRow, new S3BucketAndDistributionFlag(bucket, hasDistributions));
-        Boolean flag = Boolean.FALSE;
-        if (hasDistributions) {
-            flag = Boolean.TRUE;
+        if (this.includeDistributions) {
+            Boolean flag = hasDistributions ? Boolean.TRUE : Boolean.FALSE;
+            this.insertRow(insertRow, new Object[] {bucket.getName(), flag});
+        } else {
+            this.insertRow(insertRow, new Object[] {bucket.getName()});            
         }
-        this.insertRow(insertRow, new Object[] {bucket.getName(), flag});
         return insertRow;
     }
     
